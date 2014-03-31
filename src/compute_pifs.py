@@ -17,6 +17,16 @@ def is_isotope(x, cand):
   return False
 
 def find_isotope(x, data):
+  """
+  Find isotopes of x within data
+
+  Args:
+    x: m/z value
+    data: np array of [[m/z, intensity], ...]
+
+  Return:
+    subset of data that are isotopes
+  """
   isotopes = []
   for cx, cy in data:
     if is_isotope(x, cx):
@@ -31,12 +41,13 @@ def in_window(bound, data):
 
 def best_window(x, data, isotopes, window=1., total_steps=100.):
   """
-  return center of new window
+  return center of new window using naive exhaustive search
   """
   minx, maxx = x - window, x + window
   window_data = in_window([minx, maxx], data)
   best_pif, best_x = None, None
 
+  # For each possible window, compute its pif
   step_size = (maxx - minx) / total_steps
   for step_no in xrange(int(total_steps)):
     cur_x = (minx + window/2) + step_no * step_size
@@ -57,11 +68,20 @@ def best_window(x, data, isotopes, window=1., total_steps=100.):
   return best_x, best_pif
 
 def compute_pifs(data, window=1.):
+  """
+  Check each M/Z value if
+  * it has isotopes within window
+  * is the highest intensity isotope 
+  * looks for best pif window using best_window()
+
+  Return
+    List of (m/z value, intensity, pif, best m/z value to center window, best pif)
+  """
   ret = []
   for x, y in data:
     minx, maxx = x - window/2, x + window/2
-    vector = (data[:,0] >= minx) & (data[:,0] <= maxx)
-    window_data = data[vector]
+    window_data = in_window([minx, maxx], data)
+
     isotopes = find_isotope(x, window_data)
     if len(isotopes) == 0: continue
     if x < max(isotopes[:,0]): continue
@@ -85,13 +105,17 @@ def filter_data(data):
   return data[data[:,1] > thresh]
 
 def process_scan(scan_no, subset):
+  """
+  look for peaks in the scan data
+  """
   subset = filter_data(subset)
-  xs = subset[:,0]
-  ys = subset[:,1]
-
   peaks = compute_pifs(subset)
   return peaks
+
   if False and peaks:
+    xs = subset[:,0]
+    ys = subset[:,1]
+
     #subset = subset[(xs >= 1240) & (xs <= 1260)]
     #xs, ys = subset[:,0], subset[:,1]
     plt.clf()
@@ -106,44 +130,26 @@ def process_scan(scan_no, subset):
     pdb.set_trace()
 
 
-def rewrite_full_data():
-  if False:
-    data = []
-    with file('clean10_4.txt') as f:
-      scan_no = 0
-      for l in f:
-        arr = l.strip().split(" ")
-        arr = arr[2:]
-        xs = map(float, arr)
 
-        l = f.next()
-        arr = l.strip().split(" ")
-        arr = arr[2:]
-        ys = map(float, arr)
+def process_all_data(fname='out'):
+  """
+  process the output of rewrite_full_data()
 
-        xys = zip(xs, ys)
-        subset = np.array(xys)
-        subset = subset[subset[:,1] > 10]
-        data.append(subset)
-        scan_no += 1
-        if scan_no % 10 == 0:
-          print scan_no
+  input file has format:
+
+      M/Z values
+      Intensity values
+      M/Z values
+      Intensity values
+
+  Where each line is 
+
+      <LIST OF FLOATS>
 
 
-    print "writing"
-    with file('out', 'w') as f:
-      for subset in data:
-        xs = subset[:,0]
-        ys = subset[:,1]
-        f.write(' '.join(map(str, xs)))
-        f.write('\n')
-        f.write(' '.join(map(str, ys)))
-        f.write('\n')
-
-
-def process_all_data():
+  """
   all_pifs = []
-  with file('out') as f:
+  with file(fname) as f:
     scan_no = 0
     for l in f:
       xs = map(float, l.strip().split(' '))
@@ -163,62 +169,28 @@ def process_all_data():
         row.extend(tup)
         all_pifs.append(row)
 
+  # Write out pifs
   with file('pifs', 'w') as f:
     for row in all_pifs:
       f.write("%s\n" % ' '.join(map(str, row)))
 
 
 
+def load_pifs(fname='pifs'):
+  with file('pifs') as f:
+    data = np.array([map(float, l.strip().split(' ')) for l in f])
 
-def process_shitty_data():
-  data = []
-  with file('cleaned_ms.txt') as f:
-    dialect = csv.Sniffer().sniff(f.read(1024))
-    f.seek(0)
-    reader = csv.reader(f, dialect)
-    header = reader.next()
-    print header
+    for scan in sorted(set(data[:,0])):
+      subset = data[data[:,0] == scan]
+      idxs = np.arange(len(subset))
+      old_pifs = subset[:,3]
+      new_pifs = subset[:,-1]
+      idxs = sorted(idxs, key=lambda idx: new_pifs[idx], reverse=True)
+      idxs = idxs[:10]
+      plt.scatter(old_pifs, new_pifs, lw=0, alpha=.3, color='grey')
 
-    for l in reader:
-      try:
-        l = map(float, l)
-        data.append(l)
-      except:
-        print l
-        exit()
-
-
-  data = np.asarray(data)
-  vector = data[:,1] == 1
-  data = data[ vector ]
-  scans = sorted(set(data[:,0]))
-
-  for scan_id in scans:
-    print scan_id
-    vector = data[:,0] == scan_id
-    subset = data[vector]
-    mzidx = 9
-    intensityidx = -1
-    subset = subset[:,(mzidx, intensityidx)]
-
-    if scan_id > 2000:
-      process_scan(subset)
-
-
-with file('pifs') as f:
-  data = np.array([map(float, l.strip().split(' ')) for l in f])
-
-  for scan in sorted(set(data[:,0])):
-    subset = data[data[:,0] == scan]
-    idxs = np.arange(len(subset))
-    old_pifs = subset[:,3]
-    new_pifs = subset[:,-1]
-    idxs = sorted(idxs, key=lambda idx: new_pifs[idx], reverse=True)
-    idxs = idxs[:10]
-    plt.scatter(old_pifs, new_pifs, lw=0, alpha=.3, color='grey')
-
-    olds, news = old_pifs[idxs], new_pifs[idxs]
-    print scan, '\t', min(news), len(old_pifs)
-    plt.scatter(olds, news, lw=0, alpha=.3, color='red')
-  plt.show()
-  pdb.set_trace()
+      olds, news = old_pifs[idxs], new_pifs[idxs]
+      print scan, '\t', min(news), len(old_pifs)
+      plt.scatter(olds, news, lw=0, alpha=.3, color='red')
+    plt.show()
+    pdb.set_trace()
