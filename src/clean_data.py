@@ -60,6 +60,7 @@ def rewrite_full_data(infilename='clean10_4.txt', outfilename='out'):
 
 
 
+# deprecated
 def process_shitty_data():
   data = []
   with file('cleaned_ms.txt') as f:
@@ -95,3 +96,13 @@ def process_shitty_data():
       process_scan(subset)
 
 
+if __name__ == '__main__':
+
+
+  import sys
+  if len(sys.argv) < 3:
+    print "python clean_data.py <input file name e.g., clean10_4.txt> <output file name e.g., out>"
+    exit()
+  infilename = sys.argv[1]
+  outfilename = sys.argv[2]
+  rewrite_full_data(infilename=infilename, outfilename=outfilename)
