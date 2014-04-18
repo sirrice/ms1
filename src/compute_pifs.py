@@ -84,19 +84,27 @@ def compute_best_pif(data, x, isotopes, window):
   best_pif, best_x = None, None
   xs = window_data[:,0]
   ys = window_data[:,1]
+
+  # start and end index of sliding window
   sidx, eidx = 0, 0
 
+  # initialization
   isotope_intensity = 0.
   if window_data[0][0] in isotopes:
     isotope_intensity = window_data[0][1]
   total_intensity = window_data[0][1]
+
+
   for x, y in window_data:
+    # if x extends outside max window size,
+    # keep discarding left side of window
     while (x - xs[sidx]) > window/2.:
       if xs[sidx] in isotopes:
         isotope_intensity -= ys[sidx]
       total_intensity -= ys[sidx]
       sidx += 1
 
+    # ??? /wu
     while eidx+1 < len(xs) and (xs[eidx+1] - x) <= window/2.:
       eidx += 1
       if xs[eidx] in isotopes:
@@ -128,10 +136,16 @@ def compute_centered_pif(data, x, isotopes, window):
 
 def compute_pifs(data, valid_indices, window=1.1):
   """
-  Check each M/Z value if
-  * it has isotopes within window
-  * is the highest intensity isotope 
-  * looks for best pif window using best_window()
+  Compute the windows that 
+  * contains an actual peak by looking for isotopes
+  * have the maximum possible PIF given all the other m/z 
+    readings and the isotopes
+
+  Args
+    data: (m/z, intensity) pairs
+    valid_indicies: index vals into data of the peaks that should
+      be considered as isotopes
+    window: window width
 
   Return
     List of (m/z value, intensity, pif, best m/z value to center window, best pif)
