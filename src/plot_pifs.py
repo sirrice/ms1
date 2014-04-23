@@ -34,7 +34,8 @@ def load_pifs(fname='pifs'):
 
 def plot_old_news(fname='pifs'):
   """
-  Read the output from process_all_data() and plot the data as a scatter plot
+  Read the output from process_all_data() and plot scan_no vs pif plots to compare before
+  and after
   """
   with file(fname) as f:
     data = np.array([map(float, l.strip().split(' ')) for l in f])
